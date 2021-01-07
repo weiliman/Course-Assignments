@@ -1,0 +1,150 @@
+---
+output: pdf_document
+geometry: margin=1in
+classoption: letterpaper
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+## Appendix: R codes
+
+### Data Cleaning
+
+```{r}
+dataDir = "../data"
+smokeFile = file.path(dataDir, "smoke2014.RData")
+if (!file.exists(smokeFile)) {
+download.file("http://pbrown.ca/teaching/appliedstats/data/smoke2014.RData",
+smokeFile)
+}
+load(smokeFile)
+forInla = smoke[smoke$Age > 10, c("Age", "ever_cigarettes",
+"Sex", "Race", "state", "school", "RuralUrban",
+"Harm_belief_of_chewing_to")]
+forInla = na.omit(forInla)
+forInla$y = as.numeric(forInla$ever_cigarettes)
+forInla$ageFac = factor(as.numeric(as.character(forInla$Age)))
+forInla$chewingHarm = factor(forInla$Harm_belief_of_chewing_to,
+levels = 1:4, labels = c("less", "equal", "more",
+"dunno"))
+library("INLA")
+```
+
+### Model
+
+```{r}
+toPredict = expand.grid(ageFac = levels(forInla$ageFac), 
+                        RuralUrban = levels(forInla$RuralUrban), 
+                        Sex = levels(forInla$Sex), Race = levels(forInla$Race))
+forLincombs = do.call(inla.make.lincombs, 
+                      as.data.frame(model.matrix(
+                        ~ageFac * Race + ageFac * Sex + ageFac * RuralUrban, data = toPredict)))
+model = inla(y ~ ageFac * Race + ageFac * Sex + ageFac * RuralUrban + 
+               f(state, model = "iid", prior = 'pc.prec', param = c(log(2), 0.5)) + 
+               f(school, model = "iid", prior = 'pc.prec', param = c(log(1.2)/1.3, 0.5)), 
+             data = forInla, family = "binomial",
+             control.fixed = list(mean = 0, mean.intercept = 0, 
+                                  prec = (0.2)^(-2), prec.intercept = (10)^(-2)),
+             lincomb = forLincombs)
+```
+
+### Tables of Posterior quantitles
+
+```{r}
+knitr::kable(model$summary.fixed[c(16, 65:72), c(4, 3, 5)], digits = 3,
+             caption = "Posterior quantiles of the fixed effects 
+             (variables relating to rural-urban only)", 
+             label = 'tab:atable')
+sdRes = Pmisc::priorPostSd(model)
+knitr::kable(sdRes$summary[, c(4, 3, 5)], digits = 3,
+             caption = "Posterior quantiles of the SD of random effects", 
+             label = 'tab:atable')
+```
+
+### Plots of posterior distributions comparing to prior distributions
+
+```{r, fig.cap="Priors and Posteriors for SD of random effects",fig.height=2.5, fig.width=8}
+par(mfrow = c(1, 2), mar=c(4, 2, 2, 2))
+sdRes$school$matplot$xlab = "SD of school"
+do.call(matplot, sdRes$school$matplot)
+do.call(legend, sdRes$legend)
+sdRes$state$matplot$xlab = "SD of state"
+do.call(matplot, sdRes$state$matplot)
+do.call(legend, sdRes$legend)
+```
+
+```{r, fig.cap="Priors and Posteriors for fixed effects (variables relating to rural-urban only)", fig.height = 4.5}
+par(mfrow = c(3, 3), mar=c(4, 1.8, 1, 1))
+for (D in rownames(model$summary.fixed)[c(16, 65:72)]){
+  plot(model$marginals.fixed[[D]], type = "l", col="blue", xlab = D)
+  xseq= model$marginals.fixed[[D]][,'x']
+  lines(xseq, dnorm(xseq, sd=0.2), type = "l", col="red")
+  legend("topright", lty = 1, col = c("blue","red"), legend = c("post","prior"))
+}
+```
+
+### Plots of Predicted probabilities of smoking 
+
+```{r, fig.height=4, fig.width=9, fig.cap="Predicted probabilities of smoking for RURAL MALES by ages with 95% CIs"}
+# create matrix of predicted probabilities
+theCoef = exp(model$summary.lincomb.derived[, c("0.5quant",
+"0.025quant", "0.975quant")])
+theCoef = theCoef/(1 + theCoef)
+# create an x axis, shift age by race group
+toPredict$Age = as.numeric(as.character(toPredict$ageFac))
+toPredict$shiftX = as.numeric(toPredict$Race)/10
+toPredict$x = toPredict$Age + toPredict$shiftX
+
+toPlot = toPredict$Sex == "M" & toPredict$RuralUrban == "Rural"
+par(mar = c(4,4,1,10), xpd=TRUE)
+plot(toPredict[toPlot, "x"], theCoef[toPlot, "0.5quant"],
+     xlab = "age", ylab = "probability of smoking", 
+     ylim = c(0, 0.6), pch = 15, col = toPredict[toPlot, "Race"])
+segments(toPredict[toPlot, "x"], theCoef[toPlot, "0.025quant"], 
+         y1 = theCoef[toPlot, "0.975quant"], col = toPredict[toPlot, "Race"])
+abline(h=seq(0, 0.6, 0.05), col="gray8", lty = 3)
+legend("topright", inset = c(-0.3, 0.4), fill = 1:nlevels(toPredict$Race), 
+       legend = levels(toPredict$Race), bty = "n", title = "Race")
+```
+
+```{r, fig.height=4, fig.width=9, fig.cap="Predicted probabilities of smoking for URBAN MALES by ages with 95% CIs"}
+par(mar = c(4,4,1,10), xpd=TRUE)
+toPlot = toPredict$Sex == "M" & toPredict$RuralUrban == "Urban"
+plot(toPredict[toPlot, "x"], theCoef[toPlot, "0.5quant"],
+     xlab = "age", ylab = "probability of smoking", 
+     ylim = c(0, 0.6), pch = 15, col = toPredict[toPlot, "Race"])
+segments(toPredict[toPlot, "x"], theCoef[toPlot, "0.025quant"], 
+         y1 = theCoef[toPlot, "0.975quant"], col = toPredict[toPlot, "Race"])
+legend("topright", inset = c(-0.3, 0.4), fill = 1:nlevels(toPredict$Race), 
+       legend = levels(toPredict$Race), bty = "n", title = "Race")
+abline(h=seq(0, 0.6, 0.05), col="gray8", lty = 3)
+```
+
+```{r, fig.height=4, fig.width=9, fig.cap="Predicted probabilities of smoking for RURAL FEMALES by ages with 95% CIs"}
+par(mar = c(4,4,1,10), xpd=TRUE)
+toPlot = toPredict$Sex == "F" & toPredict$RuralUrban == "Rural"
+plot(toPredict[toPlot, "x"], theCoef[toPlot, "0.5quant"],
+     xlab = "age", ylab = "probability of smoking", 
+     ylim = c(0, 0.6), pch = 15, col = toPredict[toPlot, "Race"])
+segments(toPredict[toPlot, "x"], theCoef[toPlot, "0.025quant"], 
+         y1 = theCoef[toPlot, "0.975quant"], col = toPredict[toPlot, "Race"])
+legend("topright", inset = c(-0.3, 0.4), fill = 1:nlevels(toPredict$Race), 
+       legend = levels(toPredict$Race), bty = "n", title = "Race")
+abline(h=seq(0, 0.6, 0.05), col="gray8", lty = 3)
+```
+
+```{r, fig.height=4, fig.width=9, fig.cap="Predicted probabilities of smoking for URBAN FEMALES by ages with 95% CIs"}
+par(mar = c(4,4,1,10), xpd=TRUE)
+toPlot = toPredict$Sex == "F" & toPredict$RuralUrban == "Urban"
+plot(toPredict[toPlot, "x"], theCoef[toPlot, "0.5quant"],
+     xlab = "age", ylab = "probability of smoking", 
+     ylim = c(0, 0.6), pch = 15, col = toPredict[toPlot, "Race"])
+segments(toPredict[toPlot, "x"], theCoef[toPlot, "0.025quant"], 
+         y1 = theCoef[toPlot, "0.975quant"], col = toPredict[toPlot, "Race"])
+legend("topright", inset = c(-0.3, 0.4), fill = 1:nlevels(toPredict$Race), 
+       legend = levels(toPredict$Race), bty = "n", title = "Race")
+abline(h=seq(0, 0.6, 0.05), col="gray8", lty = 3)
+```
+
