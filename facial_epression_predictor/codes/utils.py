@@ -109,7 +109,6 @@ def plot_10_images(images, ax, ims_per_row=5, padding=10, digit_dimensions=(48, 
     """Images should be a (N_images x pixels) matrix."""
     N_images = images.shape[0]
     N_rows = np.int32(np.ceil(float(N_images) / ims_per_row))
-    pad_value = 1  # padding white lines
     concat_images = np.ones(((digit_dimensions[0] + padding) * N_rows + 30,
                              (digit_dimensions[1] + padding) * ims_per_row + padding))
     for i in range(N_images):

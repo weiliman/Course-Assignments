@@ -400,28 +400,28 @@ def main():
     num_inputs = 2304
     num_outputs = 7
 
-    # # Initialize model.
-    # model = init_nn(num_inputs, num_hiddens, num_outputs)
-    #
-    # # Check gradient implementation.
-    # print("Checking gradients...")
-    # x = np.random.rand(10, 48 * 48) * 0.1
-    # check_grad(model, nn_forward, nn_backward, "W3", x)
-    # check_grad(model, nn_forward, nn_backward, "b3", x)
-    # check_grad(model, nn_forward, nn_backward, "W2", x)
-    # check_grad(model, nn_forward, nn_backward, "b2", x)
-    # check_grad(model, nn_forward, nn_backward, "W1", x)
-    # check_grad(model, nn_forward, nn_backward, "b1", x)
-    #
-    # # Train model.
-    # model, stats = train(model, nn_forward, nn_backward, nn_update, eta,
-    #               num_epochs, batch_size)
-    #
-    # # Uncomment if you wish to save the model.
-    # save(model_file_name, model)
-    #
-    # # Uncomment if you wish to save the training statistics.
-    # save(stats_file_name, stats)
+    # Initialize model.
+    model = init_nn(num_inputs, num_hiddens, num_outputs)
+
+    # Check gradient implementation.
+    print("Checking gradients...")
+    x = np.random.rand(10, 48 * 48) * 0.1
+    check_grad(model, nn_forward, nn_backward, "W3", x)
+    check_grad(model, nn_forward, nn_backward, "b3", x)
+    check_grad(model, nn_forward, nn_backward, "W2", x)
+    check_grad(model, nn_forward, nn_backward, "b2", x)
+    check_grad(model, nn_forward, nn_backward, "W1", x)
+    check_grad(model, nn_forward, nn_backward, "b1", x)
+
+    # Train model.
+    model, stats = train(model, nn_forward, nn_backward, nn_update, eta,
+                  num_epochs, batch_size)
+
+    # Uncomment if you wish to save the model.
+    save(model_file_name, model)
+
+    # Uncomment if you wish to save the training statistics.
+    save(stats_file_name, stats)
 
     # load an saved model
     model = load(model_file_name)
